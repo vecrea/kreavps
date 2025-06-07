@@ -1,0 +1,30 @@
+# Configuration simple et stable pour Authelia
+server:
+  host: 0.0.0.0
+  port: 9091
+
+session:
+  secret: ${AUTHELIA_SESSION_SECRET}
+  name: kreavps_session
+  domain: ${DOMAIN}
+  
+jwt_secret: ${AUTHELIA_JWT_SECRET}
+
+authentication_backend:
+  file:
+    path: /config/users_database.yml
+
+access_control:
+  default_policy: one_factor # On simplifie, une seule authentification suffit
+  rules:
+    - domain: "auth.${DOMAIN}"
+      policy: bypass
+    - domain:
+      - "n8n.${DOMAIN}"
+      - "chat.${DOMAIN}"
+      - "db.${DOMAIN}" # Pour Qdrant
+      - "docker.${DOMAIN}"
+
+notifier:
+  filesystem:
+    filename: /tmp/notifications.log
