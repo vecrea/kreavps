@@ -1,0 +1,9 @@
+# Fichier des utilisateurs pour Authelia.
+# On le remplira manuellement.
+users:
+  kreacity:
+    displayname: "Admin KreaCity"
+    password: "" # On va générer ça après
+    email: "info@krea.city"
+    groups:
+      - admins
