@@ -1,6 +1,7 @@
-# KreaVPS v3 - docker-compose.yml - Architecture Simplifiée et Complète
+# KreaVPS v4 - docker-compose.yml - Architecture Complète avec Authentik
 
 services:
+  # 1. INFRASTRUCTURE & REVERSE PROXY
   traefik:
     image: traefik:v3.0
     container_name: traefik
@@ -8,6 +9,7 @@ services:
     command:
       - "--api.dashboard=true"
       - "--providers.docker=true"
+      - "--providers.file.directory=/etc/traefik/dynamic" # Dit à Traefik de lire ce dossier
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
@@ -20,41 +22,12 @@ services:
       - "443:443"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./configs/traefik:/etc/traefik/dynamic:ro" # On monte notre fichier de config dynamique
       - "letsencrypt-certs:/letsencrypt"
     networks:
       - proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN}`)"
-      - "traefik.http.routers.traefik-dashboard.middlewares=authelia@docker"
-      - "traefik.http.routers.traefik-dashboard.service=api@internal"
-      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
-      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
 
-  authelia:
-    image: authelia/authelia:latest
-    container_name: authelia
-    restart: unless-stopped
-    volumes:
-      - ./configs/authelia:/config
-    networks:
-      - proxy
-      - default
-    environment:
-      - TZ=${TIMEZONE}
-      - AUTHELIA_JWT_SECRET=${AUTHELIA_JWT_SECRET}
-      - AUTHELIA_SESSION_SECRET=${AUTHELIA_SESSION_SECRET}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.authelia.rule=Host(`auth.${DOMAIN}`)"
-      - "traefik.http.routers.authelia.service=authelia"
-      - "traefik.http.services.authelia.loadbalancer.server.port=9091"
-      - "traefik.http.routers.authelia.entrypoints=websecure"
-      - "traefik.http.routers.authelia.tls.certresolver=letsencrypt"
-
+  # 2. BASE DE DONNÉES & CACHE
   postgres:
     image: postgres:15-alpine
     container_name: postgres
@@ -72,7 +45,63 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  
+  redis:
+    image: redis:alpine
+    container_name: redis
+    restart: unless-stopped
+    networks:
+      - default
 
+  # 3. SÉCURITÉ : AUTHENTIK
+  authentik-server:
+    image: ghcr.io/goauthentik/server:latest
+    container_name: authentik-server
+    restart: unless-stopped
+    networks:
+      - proxy
+      - default
+    environment:
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+      - AUTHENTIK_POSTGRESQL__HOST=postgres
+      - AUTHENTIK_POSTGRESQL__USER=${POSTGRES_USER}
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${POSTGRES_PASSWORD}
+      - AUTHENTIK_POSTGRESQL__NAME=authentik # DB dédiée pour authentik
+      - AUTHENTIK_REDIS__HOST=redis
+    volumes:
+      - "authentik-data:/data"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.authentik.rule=Host(`auth.${DOMAIN}`)"
+      - "traefik.http.routers.authentik.service=authentik-server"
+      - "traefik.http.services.authentik-server.loadbalancer.server.port=9000"
+      - "traefik.http.routers.authentik.entrypoints=websecure"
+      - "traefik.http.routers.authentik.tls.certresolver=letsencrypt"
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:latest
+    container_name: authentik-worker
+    restart: unless-stopped
+    command: worker
+    networks:
+      - default
+    environment:
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+      - AUTHENTIK_POSTGRESQL__HOST=postgres
+      - AUTHENTIK_POSTGRESQL__USER=${POSTGRES_USER}
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${POSTGRES_PASSWORD}
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_REDIS__HOST=redis
+    volumes:
+      - "authentik-data:/data"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+
+  # 4. STACK APPLICATIVE
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant
@@ -84,7 +113,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.qdrant.rule=Host(`db.${DOMAIN}`)"
-      - "traefik.http.routers.qdrant.middlewares=authelia@docker"
+      - "traefik.http.routers.qdrant.middlewares=authentik@file"
       - "traefik.http.routers.qdrant.service=qdrant"
       - "traefik.http.services.qdrant.loadbalancer.server.port=6333"
       - "traefik.http.routers.qdrant.entrypoints=websecure"
@@ -112,7 +141,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.n8n.rule=Host(`n8n.${DOMAIN}`)"
-      - "traefik.http.routers.n8n.middlewares=authelia@docker"
+      - "traefik.http.routers.n8n.middlewares=authentik@file"
       - "traefik.http.routers.n8n.service=n8n"
       - "traefik.http.services.n8n.loadbalancer.server.port=5678"
       - "traefik.http.routers.n8n.entrypoints=websecure"
@@ -134,7 +163,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.open-webui.rule=Host(`chat.${DOMAIN}`)"
-      - "traefik.http.routers.open-webui.middlewares=authelia@docker"
+      - "traefik.http.routers.open-webui.middlewares=authentik@file"
       - "traefik.http.routers.open-webui.service=open-webui"
       - "traefik.http.services.open-webui.loadbalancer.server.port=8080"
       - "traefik.http.routers.open-webui.entrypoints=websecure"
@@ -161,7 +190,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.portainer.rule=Host(`docker.${DOMAIN}`)"
-      - "traefik.http.routers.portainer.middlewares=authelia@docker"
+      - "traefik.http.routers.portainer.middlewares=authentik@file"
       - "traefik.http.routers.portainer.service=portainer"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
       - "traefik.http.routers.portainer.entrypoints=websecure"
@@ -175,8 +204,9 @@ networks:
 
 volumes:
   letsencrypt-certs: {}
-  authelia-data: {}
   postgres-data: {}
+  redis-data: {}
+  authentik-data: {}
   qdrant-data: {}
   n8n-data: {}
   open-webui-data: {}
