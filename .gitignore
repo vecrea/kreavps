@@ -1,9 +1,35 @@
-certs/kcc.crt
-certs/SectigoPublicServerAuthenticationCADVR36.crt
-certs/SectigoPublicServerAuthenticationRootR46_USERTrust.crt
-certs/STAR_kreacity_cloud.crt
-certs/USERTrustRSACertificationAuthority.crt
-kreacity.cloud.csr
-kreacitycloud.csr
+# SSL certificates and private keys
+ssl/private/
+ssl/certs/
+*.key
+*.crt
+*.pem
+
+# Docker volumes data
+volumes/
+
+# Environment files
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS generated files
 .DS_Store
-.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backup files
+*.bak
+*~

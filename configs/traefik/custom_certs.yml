@@ -1,6 +1,0 @@
-# /root/kreavps/configs/traefik/custom_certs.yml
-
-tls:
-  certificates:
-    - certFile: "/etc/traefik/certs/kcc.crt"
-      keyFile: "/etc/traefik/certs/kreacity.cloud.key"
