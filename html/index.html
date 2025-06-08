@@ -80,6 +80,11 @@
             box-shadow: 0 15px 30px rgba(28, 45, 185, 0.2);
         }
         
+        .service-card:nth-child(4):hover {
+            border-color: #3486e7;
+            box-shadow: 0 15px 30px rgba(52, 134, 231, 0.2);
+        }
+        
         .service-icon {
             font-size: 2.5rem;
             margin-bottom: 15px;
@@ -115,6 +120,10 @@
         
         .service-card:nth-child(3):hover .service-url {
             color: #3486e7;
+        }
+        
+        .service-card:nth-child(4):hover .service-url {
+            color: #f82094;
         }
         
         .ssl-badge {
@@ -172,6 +181,13 @@
                 <div class="service-name">Qdrant</div>
                 <div class="service-description">Base de données vectorielle</div>
                 <div class="service-url">qdrant.kreacity.cloud</div>
+            </a>
+            
+            <a href="https://qdrant.kreacity.cloud/dashboard" target="_blank" class="service-card">
+                <div class="service-icon">📊</div>
+                <div class="service-name">Qdrant Dashboard</div>
+                <div class="service-description">Interface de gestion</div>
+                <div class="service-url">qdrant.kreacity.cloud/dashboard</div>
             </a>
             
             <a href="https://ollama.kreacity.cloud" target="_blank" class="service-card">
