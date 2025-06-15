@@ -33,3 +33,8 @@ Thumbs.db
 # Backup files
 *.bak
 *~
+.bash_history
+.cache/
+.ssh/
+.lesshst
+nginx-conf/*.backup*
